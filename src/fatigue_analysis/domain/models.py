@@ -167,3 +167,18 @@ class QualityResult:
     validated_series: OpenFaceSeries | None
     status: SampleStatus
     exclusions: tuple[ExclusionRecord, ...]
+
+
+@dataclass(frozen=True)
+class FeatureRecord:
+    """内部long形式の特徴量1値。"""
+
+    sample_id: str
+    signal_id: str
+    source_series: str
+    feature_id: str
+    feature_instance: str
+    value: float | None
+    unit: str
+    status: str
+    reason_code: str | None = None

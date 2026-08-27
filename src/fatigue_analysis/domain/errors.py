@@ -15,3 +15,7 @@ class InputContractError(FatigueAnalysisError):
 
 class OutputConflictError(FatigueAnalysisError):
     """既存成果物を暗黙に上書きしそうな場合の例外。"""
+
+
+class NodeExecutionError(FatigueAnalysisError):
+    """node内の数値処理や成果物生成が失敗した場合の例外。"""
