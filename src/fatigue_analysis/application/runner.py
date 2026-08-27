@@ -26,6 +26,7 @@ from fatigue_analysis.domain.models import (
 from fatigue_analysis.domain.signals import resolve_au_intensity_signal_ids
 from fatigue_analysis.nodes.outputs.feature_table import (
     feature_column_name,
+    feature_output_columns,
     feature_records_to_wide_rows,
 )
 from fatigue_analysis.nodes.preprocessing.lowess import compute_lowess_series
@@ -133,7 +134,7 @@ def run_features(
     write_csv_rows(
         feature_csv,
         wide_rows,
-        fieldnames=(*report.columns, *feature_columns),
+        fieldnames=feature_output_columns(report.columns, feature_columns),
         encoding=config.outputs.csv_encoding,
     )
 

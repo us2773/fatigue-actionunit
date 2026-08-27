@@ -48,6 +48,8 @@ def test_cli_validate_and_features(tmp_path: Path) -> None:
 
     assert manifest_json.exists()
     assert len(rows) == 2
+    assert rows[0]["class_label"] == "だるい"
+    assert rows[0]["fatigue_level_label"] == "元気"
     assert "AU01_r__trend_stats__mean" in rows[0]
 
 

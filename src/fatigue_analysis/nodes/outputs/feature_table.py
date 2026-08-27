@@ -5,6 +5,11 @@ from __future__ import annotations
 import re
 
 from fatigue_analysis.domain.errors import OutputConflictError
+from fatigue_analysis.domain.labels import (
+    CLASS_LABEL_COLUMN,
+    FATIGUE_LEVEL_LABEL_COLUMN,
+    REPORT_LABEL_COLUMNS,
+)
 from fatigue_analysis.domain.models import FeatureRecord, ReportTable
 
 SAFE_COLUMN_PATTERN = re.compile(r"^[A-Za-z0-9_]+$")
@@ -27,6 +32,7 @@ def feature_records_to_wide_rows(
 ) -> tuple[dict[str, object], ...]:
     """report列を先頭に保ったwide形式行へ変換する。"""
 
+    _validate_label_column_conflicts(report.columns)
     values_by_sample: dict[str, dict[str, float | None]] = {
         sample.sample_id: {} for sample in report.samples
     }
@@ -48,6 +54,29 @@ def feature_records_to_wide_rows(
         row: dict[str, object] = {
             column: sample.raw_columns.get(column, "") for column in report.columns
         }
+        row[CLASS_LABEL_COLUMN] = sample.class_label
+        row[FATIGUE_LEVEL_LABEL_COLUMN] = sample.fatigue_level_label
         row.update(values_by_sample[sample.sample_id])
         rows.append(row)
     return tuple(rows)
+
+
+def feature_output_columns(
+    report_columns: tuple[str, ...],
+    feature_columns: tuple[str, ...],
+) -> tuple[str, ...]:
+    """特徴量wide CSVの列順を返す。"""
+
+    _validate_label_column_conflicts(report_columns)
+    return (*report_columns, *REPORT_LABEL_COLUMNS, *feature_columns)
+
+
+def _validate_label_column_conflicts(report_columns: tuple[str, ...]) -> None:
+    conflicting_columns = [
+        column for column in REPORT_LABEL_COLUMNS if column in report_columns
+    ]
+    if conflicting_columns:
+        raise OutputConflictError(
+            "report.csv の列名が出力用ラベル列と衝突しています: "
+            + ", ".join(conflicting_columns)
+        )

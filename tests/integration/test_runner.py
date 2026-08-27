@@ -26,6 +26,10 @@ def test_run_features_writes_wide_csv_and_manifest(tmp_path: Path) -> None:
     rows = list(csv.DictReader(result.feature_csv.open("r", encoding="utf-8-sig")))
     assert len(rows) == 2
     assert rows[0]["Name"] == "sample-001"
+    assert rows[0]["class_label"] == "だるい"
+    assert rows[0]["fatigue_level_label"] == "元気"
+    assert rows[1]["class_label"] == ""
+    assert rows[1]["fatigue_level_label"] == ""
     assert "AU01_r__trend_stats__mean" in rows[0]
     assert "AU01_r__raw_peaks__count" in rows[0]
     assert "AU01_r__raw_stft__mean_power_3_hz" in rows[0]

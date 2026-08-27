@@ -16,6 +16,7 @@ from fatigue_analysis.nodes.features.statistics import compute_trend_statistics
 from fatigue_analysis.nodes.features.stft_power import compute_raw_stft_mean_power
 from fatigue_analysis.nodes.outputs.feature_table import (
     feature_column_name,
+    feature_output_columns,
     feature_records_to_wide_rows,
 )
 from fatigue_analysis.nodes.preprocessing.lowess import compute_lowess_series
@@ -154,8 +155,24 @@ def test_feature_column_name_and_wide_rows(tmp_path: Path) -> None:
     rows = feature_records_to_wide_rows(report, records)
 
     assert rows[0]["Name"] == "sample-001"
+    assert rows[0]["class_label"] == "だるい"
+    assert rows[0]["fatigue_level_label"] == "元気"
     assert rows[0]["AU01_r__raw_peaks__count"] == 1.0
     assert rows[0]["AU01_r__raw_peaks__rate_hz"] == 1.0
+    assert feature_output_columns(
+        report.columns,
+        ("AU01_r__raw_peaks__count",),
+    ) == (
+        "Name",
+        "person",
+        "check_date",
+        "class",
+        "fatigue_level",
+        "is_baseface",
+        "class_label",
+        "fatigue_level_label",
+        "AU01_r__raw_peaks__count",
+    )
 
 
 def test_duplicate_feature_column_is_rejected(tmp_path: Path) -> None:

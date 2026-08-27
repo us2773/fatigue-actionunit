@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Iterable, Mapping
 
 from fatigue_analysis.domain.errors import InputContractError
+from fatigue_analysis.domain.labels import CLASS_LABELS, FATIGUE_LEVEL_LABELS
 from fatigue_analysis.domain.models import ReportTable, SampleMetadata
 
 REQUIRED_REPORT_COLUMNS: tuple[str, ...] = (
@@ -119,9 +120,9 @@ def _parse_report_row(row: Mapping[str, str], *, row_number: int) -> SampleMetad
                 f"{row_number}行目は基準表情のためclass/fatigue_levelは空欄が必要です。"
             )
     else:
-        if class_code not in {1, 2, 3, 4}:
+        if class_code not in CLASS_LABELS:
             raise InputContractError(f"{row_number}行目 class は1〜4が必要です。")
-        if fatigue_level not in {1, 2, 3}:
+        if fatigue_level not in FATIGUE_LEVEL_LABELS:
             raise InputContractError(f"{row_number}行目 fatigue_level は1〜3が必要です。")
 
     return SampleMetadata.create(

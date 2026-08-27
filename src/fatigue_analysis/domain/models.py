@@ -10,6 +10,8 @@ from typing import Any, Mapping
 import numpy as np
 from numpy.typing import NDArray
 
+from fatigue_analysis.domain.labels import class_label, fatigue_level_label
+
 
 @dataclass(frozen=True)
 class SampleMetadata:
@@ -22,6 +24,18 @@ class SampleMetadata:
     fatigue_level: int | None
     is_baseface: bool
     raw_columns: Mapping[str, str]
+
+    @property
+    def class_label(self) -> str:
+        """分類コードに対応する研究者向けラベルを返す。"""
+
+        return class_label(self.class_code)
+
+    @property
+    def fatigue_level_label(self) -> str:
+        """疲労印象度コードに対応する研究者向けラベルを返す。"""
+
+        return fatigue_level_label(self.fatigue_level)
 
     @classmethod
     def create(
