@@ -34,6 +34,17 @@ def test_cli_validate_and_features(tmp_path: Path) -> None:
     assert "Plan summary" in plan.stdout
     assert "openface_csv=2 existing, 0 missing" in plan.stdout
 
+    nodes = subprocess.run(
+        [sys.executable, "-m", "fatigue_analysis", "list", "nodes"],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert nodes.returncode == 0
+    assert "trend_statistics: version=1" in nodes.stdout
+    assert "source_series=trend" in nodes.stdout
+
     features = subprocess.run(
         [
             sys.executable,

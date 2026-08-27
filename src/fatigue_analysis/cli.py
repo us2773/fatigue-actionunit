@@ -10,6 +10,7 @@ from pathlib import Path
 from fatigue_analysis.adapters.report_csv import read_report_csv, validate_report_paths
 from fatigue_analysis.adapters.openface_runner import run_openface_conversions
 from fatigue_analysis.application.planner import ExecutionPlan, build_execution_plan
+from fatigue_analysis.application.registry import default_feature_registry
 from fatigue_analysis.application.runner import run_features
 from fatigue_analysis.config.loader import config_to_yaml_text, init_config, load_config
 from fatigue_analysis.domain.errors import (
@@ -74,8 +75,11 @@ def _build_parser() -> argparse.ArgumentParser:
     list_signals = list_subparsers.add_parser("signals", help="利用可能な信号を表示する")
     list_signals.set_defaults(handler=_handle_list_signals)
 
-    list_nodes = list_subparsers.add_parser("nodes", help="登録予定nodeを表示する")
+    list_nodes = list_subparsers.add_parser("nodes", help="登録済みnode仕様を表示する")
     list_nodes.set_defaults(handler=_handle_list_nodes)
+
+    list_features = list_subparsers.add_parser("features", help="登録済み特徴量nodeを表示する")
+    list_features.set_defaults(handler=_handle_list_nodes)
 
     validate_parser = subparsers.add_parser("validate", help="入力ファイルを検証する")
     validate_parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
@@ -141,9 +145,15 @@ def _handle_list_signals(args: argparse.Namespace) -> int:
 
 def _handle_list_nodes(args: argparse.Namespace) -> int:
     del args
-    print("trend_statistics")
-    print("raw_peaks")
-    print("raw_stft_mean_power")
+    registry = default_feature_registry()
+    for spec in registry.list_specs():
+        print(
+            f"{spec.node_id}: "
+            f"version={spec.version}, "
+            f"source_series={spec.source_series}, "
+            f"signal_type={spec.supported_signal_type}, "
+            f"metrics={','.join(spec.metrics)}"
+        )
     return 0
 
 
