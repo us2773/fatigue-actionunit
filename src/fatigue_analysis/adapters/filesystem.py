@@ -20,9 +20,6 @@ def create_run_directories(output_root: Path, run_id: str, *, overwrite: bool) -
     for child in (
         run_dir / "features",
         run_dir / "validation",
-        run_dir / "figures" / "timeseries",
-        run_dir / "figures" / "distributions",
-        run_dir / "plot_data",
     ):
         child.mkdir(parents=True, exist_ok=True)
     return run_dir

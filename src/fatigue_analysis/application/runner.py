@@ -15,9 +15,6 @@ from fatigue_analysis.adapters.openface_csv import read_openface_columns, read_o
 from fatigue_analysis.adapters.report_csv import read_report_csv, validate_report_paths
 from fatigue_analysis.application.registry import FeatureRegistry, default_feature_registry
 from fatigue_analysis.application.run_manifest import build_manifest, current_utc
-from fatigue_analysis.application.visualization_runner import (
-    run_configured_distribution_visualizations,
-)
 from fatigue_analysis.config.models import AnalysisConfig, FeatureConfig
 from fatigue_analysis.domain.errors import ConfigError
 from fatigue_analysis.domain.models import (
@@ -140,12 +137,6 @@ def run_features(
         fieldnames=feature_output_columns(report.columns, feature_columns),
         encoding=config.outputs.csv_encoding,
     )
-    visualization_artifacts = run_configured_distribution_visualizations(
-        config,
-        run_dir=run_dir,
-        rows=wide_rows,
-        feature_columns=feature_columns,
-    )
 
     sample_status_csv = run_dir / "validation" / "sample_status.csv"
     write_csv_rows(
@@ -181,9 +172,6 @@ def run_features(
         "exclusions_csv": _artifact_value(run_dir, exclusions_csv),
         "features_wide_sha256": sha256_file(feature_csv),
     }
-    for artifact in visualization_artifacts:
-        artifacts[artifact.key] = _artifact_value(run_dir, artifact.path)
-        artifacts[f"{artifact.key}_sha256"] = sha256_file(artifact.path)
     manifest = build_manifest(
         run_id=run_id,
         status=status,

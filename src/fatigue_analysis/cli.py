@@ -12,6 +12,10 @@ from fatigue_analysis.adapters.openface_runner import run_openface_conversions
 from fatigue_analysis.application.planner import ExecutionPlan, build_execution_plan
 from fatigue_analysis.application.registry import default_feature_registry
 from fatigue_analysis.application.runner import run_features
+from fatigue_analysis.application.visualization_runner import (
+    plot_distributions_from_feature_csv,
+    plot_timeseries_from_openface_csv,
+)
 from fatigue_analysis.config.loader import (
     config_to_yaml_text,
     init_config,
@@ -120,6 +124,34 @@ def _build_parser() -> argparse.ArgumentParser:
     openface_parser.add_argument("--run-id", default=None)
     openface_parser.add_argument("--force", action="store_true")
     openface_parser.set_defaults(handler=_handle_openface)
+
+    plot_parser = subparsers.add_parser("plot", help="既存成果物から可視化を生成する")
+    plot_subparsers = plot_parser.add_subparsers(dest="plot_target", required=True)
+
+    plot_distributions = plot_subparsers.add_parser(
+        "distributions",
+        help="既存features_wide.csvから分布図を生成する",
+    )
+    plot_distributions.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+    plot_distributions.add_argument("--run-id", required=True)
+    plot_distributions.add_argument("--plot-id", default=None)
+    plot_distributions.set_defaults(handler=_handle_plot_distributions)
+
+    plot_timeseries = plot_subparsers.add_parser(
+        "timeseries",
+        help="OpenFace CSVから時系列図を生成する",
+    )
+    plot_timeseries.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+    plot_timeseries.add_argument("--sample-id", required=True)
+    plot_timeseries.add_argument("--au", type=int, nargs="+", required=True)
+    plot_timeseries.add_argument(
+        "--series",
+        nargs="+",
+        default=("raw_validated", "trend"),
+        choices=("raw_validated", "trend", "residual"),
+    )
+    plot_timeseries.add_argument("--plot-id", default=None)
+    plot_timeseries.set_defaults(handler=_handle_plot_timeseries)
 
     return parser
 
@@ -264,5 +296,50 @@ def _handle_openface(args: argparse.Namespace) -> int:
     print(
         "OpenFace complete: "
         f"run_id={run_id}, created={created}, skipped={skipped}"
+    )
+    return 0
+
+
+def _handle_plot_distributions(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    plot_id = args.plot_id or f"plot-{uuid.uuid4().hex[:12]}"
+    run_dir = config.paths.output_root / args.run_id
+    feature_csv = run_dir / "features" / "features_wide.csv"
+    output_root = run_dir / "plots" / plot_id
+    artifacts = plot_distributions_from_feature_csv(
+        config,
+        feature_csv=feature_csv,
+        output_root=output_root,
+    )
+    print(
+        "Plot complete: "
+        f"target=distributions, "
+        f"run_id={args.run_id}, "
+        f"plot_id={plot_id}, "
+        f"artifacts={len(artifacts)}, "
+        f"output={output_root}"
+    )
+    return 0
+
+
+def _handle_plot_timeseries(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    plot_id = args.plot_id or f"plot-{uuid.uuid4().hex[:12]}"
+    output_root = config.paths.output_root / "plots" / plot_id
+    artifacts = plot_timeseries_from_openface_csv(
+        config,
+        sample_id=args.sample_id,
+        au_numbers=tuple(args.au),
+        series_kinds=tuple(args.series),
+        output_root=output_root,
+        plot_id=plot_id,
+    )
+    print(
+        "Plot complete: "
+        f"target=timeseries, "
+        f"sample_id={args.sample_id}, "
+        f"plot_id={plot_id}, "
+        f"artifacts={len(artifacts)}, "
+        f"output={output_root}"
     )
     return 0

@@ -95,6 +95,84 @@ def test_cli_validate_and_features(tmp_path: Path) -> None:
     assert rows[0]["class_label"] == "だるい"
     assert rows[0]["fatigue_level_label"] == "元気"
     assert "AU01_r__trend_stats__mean" in rows[0]
+    assert not (
+        tmp_path
+        / "data"
+        / "outputs"
+        / "e2e-run"
+        / "figures"
+        / "distributions"
+    ).exists()
+
+    distributions = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "fatigue_analysis",
+            "plot",
+            "distributions",
+            "--config",
+            str(config_path),
+            "--run-id",
+            "e2e-run",
+            "--plot-id",
+            "dist-check",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert distributions.returncode == 0
+    assert "Plot complete" in distributions.stdout
+    assert (
+        tmp_path
+        / "data"
+        / "outputs"
+        / "e2e-run"
+        / "plots"
+        / "dist-check"
+        / "figures"
+        / "distributions"
+        / "dist_01_AU01_r__trend_stats__mean.png"
+    ).exists()
+
+    timeseries = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "fatigue_analysis",
+            "plot",
+            "timeseries",
+            "--config",
+            str(config_path),
+            "--sample-id",
+            "sample-001",
+            "--au",
+            "1",
+            "--series",
+            "raw_validated",
+            "trend",
+            "--plot-id",
+            "ts-check",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert timeseries.returncode == 0
+    assert "Plot complete" in timeseries.stdout
+    assert (
+        tmp_path
+        / "data"
+        / "outputs"
+        / "plots"
+        / "ts-check"
+        / "figures"
+        / "timeseries"
+        / "timeseries_sample-001_AU01_r.png"
+    ).exists()
 
 
 def _write_synthetic_project(tmp_path: Path) -> Path:
@@ -167,7 +245,15 @@ analysis:
   derived_columns: {{}}
 visualizations:
   timeseries: []
-  distributions: []
+  distributions:
+    - feature_patterns: ["AU01_r__trend_stats__mean"]
+      groups:
+        - label: baseline
+          where: {{is_baseface: [1]}}
+        - label: non_base
+          where: {{is_baseface: [0]}}
+      color_by: person
+      facet_by: null
 outputs:
   save_intermediate_nodes: []
   csv_encoding: utf-8-sig

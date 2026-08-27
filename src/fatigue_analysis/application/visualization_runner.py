@@ -1,18 +1,24 @@
-"""YAML設定から可視化成果物を生成するapplication service。"""
+"""既存成果物またはOpenFace CSVから可視化成果物を生成するservice。"""
 
 from __future__ import annotations
 
+import csv
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from fatigue_analysis.adapters.openface_csv import read_openface_columns, read_openface_csv
 from fatigue_analysis.config.models import AnalysisConfig
 from fatigue_analysis.domain.errors import ConfigError
+from fatigue_analysis.domain.signals import au_number_to_signal_id
+from fatigue_analysis.nodes.preprocessing.lowess import compute_lowess_series
+from fatigue_analysis.nodes.preprocessing.quality import apply_quality_pipeline
 from fatigue_analysis.visualization.distributions import (
     DistributionGroup,
     plot_feature_distribution,
 )
+from fatigue_analysis.visualization.timeseries import plot_timeseries
 
 
 @dataclass(frozen=True)
@@ -23,17 +29,27 @@ class VisualizationArtifact:
     path: Path
 
 
-def run_configured_distribution_visualizations(
+def plot_distributions_from_feature_csv(
     config: AnalysisConfig,
     *,
-    run_dir: Path,
-    rows: Sequence[Mapping[str, object]],
-    feature_columns: tuple[str, ...],
+    feature_csv: Path,
+    output_root: Path,
 ) -> tuple[VisualizationArtifact, ...]:
-    """設定された特徴量分布図を生成する。"""
+    """既存特徴量CSVを読み、設定された特徴量分布図を生成する。"""
 
     if not config.visualizations.distributions:
         return ()
+    if not feature_csv.exists():
+        raise ConfigError(f"特徴量CSVが見つかりません: {feature_csv}")
+
+    with feature_csv.open("r", encoding=config.outputs.csv_encoding, newline="") as csv_file:
+        reader = csv.DictReader(csv_file)
+        if reader.fieldnames is None:
+            raise ConfigError(f"特徴量CSVにヘッダーがありません: {feature_csv}")
+        rows = tuple(dict(row) for row in reader)
+        feature_columns = tuple(
+            column for column in reader.fieldnames if "__" in column
+        )
 
     csv_rows = _string_rows(rows)
     artifacts: list[VisualizationArtifact] = []
@@ -59,8 +75,8 @@ def run_configured_distribution_visualizations(
         )
         for feature_column in matched_features:
             artifact_stem = f"dist_{config_index:02d}_{feature_column}"
-            output_png = run_dir / "figures" / "distributions" / f"{artifact_stem}.png"
-            stats_csv = run_dir / "plot_data" / "distributions" / f"{artifact_stem}_stats.csv"
+            output_png = output_root / "figures" / "distributions" / f"{artifact_stem}.png"
+            stats_csv = output_root / "plot_data" / "distributions" / f"{artifact_stem}_stats.csv"
             plot_feature_distribution(
                 csv_rows,
                 feature_column=feature_column,
@@ -82,6 +98,84 @@ def run_configured_distribution_visualizations(
                 )
             )
     return tuple(artifacts)
+
+
+def plot_timeseries_from_openface_csv(
+    config: AnalysisConfig,
+    *,
+    sample_id: str,
+    au_numbers: tuple[int, ...],
+    series_kinds: tuple[str, ...],
+    output_root: Path,
+    plot_id: str,
+) -> tuple[VisualizationArtifact, ...]:
+    """1サンプルのOpenFace CSVから時系列図を生成する。"""
+
+    if not sample_id:
+        raise ConfigError("--sample-id は空にできません。")
+    if not au_numbers:
+        raise ConfigError("--au は1件以上必要です。")
+    allowed_series = {"raw_validated", "trend", "residual"}
+    unknown_series = sorted(set(series_kinds) - allowed_series)
+    if unknown_series:
+        raise ConfigError("未対応のseriesです: " + ", ".join(unknown_series))
+
+    openface_csv = config.paths.openface_csv_dir / f"{sample_id}.csv"
+    available_columns = read_openface_columns(openface_csv)
+    signal_ids = tuple(au_number_to_signal_id(au) for au in au_numbers)
+    missing_signals = [
+        signal_id for signal_id in signal_ids if signal_id not in available_columns
+    ]
+    if missing_signals:
+        raise ConfigError("OpenFace CSVに対象AU列がありません: " + ", ".join(missing_signals))
+
+    raw_loaded = read_openface_csv(
+        openface_csv,
+        sample_id=sample_id,
+        signal_ids=signal_ids,
+    )
+    quality_result = apply_quality_pipeline(
+        raw_loaded,
+        initial_trim_ratio=config.preprocessing.initial_trim_ratio,
+        confidence_threshold=config.preprocessing.confidence_threshold,
+    )
+    if quality_result.validated_series is None:
+        raise ConfigError(
+            f"時系列可視化に使える採用区間がありません: {quality_result.status.message}"
+        )
+
+    raw_validated = quality_result.validated_series
+    series_by_kind = {"raw_validated": raw_validated}
+    if "trend" in series_kinds or "residual" in series_kinds:
+        if not config.preprocessing.lowess.enabled:
+            raise ConfigError("trend/residualの時系列可視化にはLOWESS前処理が必要です。")
+        trend, residual = compute_lowess_series(
+            raw_validated,
+            frac=config.preprocessing.lowess.frac,
+            it=config.preprocessing.lowess.it,
+            delta=config.preprocessing.lowess.delta,
+        )
+        series_by_kind["trend"] = trend
+        series_by_kind["residual"] = residual
+
+    selected_series = {
+        series_kind: series_by_kind[series_kind] for series_kind in series_kinds
+    }
+    signal_part = "_".join(signal_ids)
+    artifact_stem = f"timeseries_{sample_id}_{signal_part}"
+    output_png = output_root / "figures" / "timeseries" / f"{artifact_stem}.png"
+    plot_data_csv = output_root / "plot_data" / "timeseries" / f"{artifact_stem}.csv"
+    plot_timeseries(
+        selected_series,
+        signal_ids=signal_ids,
+        output_png=output_png,
+        plot_data_csv=plot_data_csv,
+        run_id=plot_id,
+    )
+    return (
+        VisualizationArtifact(key="timeseries_png", path=output_png),
+        VisualizationArtifact(key="timeseries_plot_data_csv", path=plot_data_csv),
+    )
 
 
 @dataclass(frozen=True)

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from fatigue_analysis.application.visualization_runner import (
-    run_configured_distribution_visualizations,
+    plot_distributions_from_feature_csv,
 )
 from fatigue_analysis.config.loader import load_config
 from fatigue_analysis.domain.errors import ConfigError
@@ -17,19 +17,16 @@ def test_distribution_runner_rejects_overlapping_groups(tmp_path: Path) -> None:
     config = load_config(_write_config(tmp_path))
 
     with pytest.raises(ConfigError, match="重複"):
-        run_configured_distribution_visualizations(
+        feature_csv = tmp_path / "features_wide.csv"
+        feature_csv.write_text(
+            "Name,is_baseface,class,person,AU01_r__trend_stats__mean\n"
+            "sample-001,0,1,1,0.4\n",
+            encoding="utf-8-sig",
+        )
+        plot_distributions_from_feature_csv(
             config,
-            run_dir=tmp_path / "run",
-            rows=(
-                {
-                    "Name": "sample-001",
-                    "is_baseface": "0",
-                    "class": "1",
-                    "person": "1",
-                    "AU01_r__trend_stats__mean": 0.4,
-                },
-            ),
-            feature_columns=("AU01_r__trend_stats__mean",),
+            feature_csv=feature_csv,
+            output_root=tmp_path / "plot",
         )
 
 
