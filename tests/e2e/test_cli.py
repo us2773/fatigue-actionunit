@@ -23,6 +23,17 @@ def test_cli_validate_and_features(tmp_path: Path) -> None:
     assert validate.returncode == 0
     assert "Inputs are valid" in validate.stdout
 
+    plan = subprocess.run(
+        [sys.executable, "-m", "fatigue_analysis", "plan", "--config", str(config_path)],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert plan.returncode == 0
+    assert "Plan summary" in plan.stdout
+    assert "openface_csv=2 existing, 0 missing" in plan.stdout
+
     features = subprocess.run(
         [
             sys.executable,

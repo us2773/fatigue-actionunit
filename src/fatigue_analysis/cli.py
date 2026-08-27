@@ -9,6 +9,7 @@ from pathlib import Path
 
 from fatigue_analysis.adapters.report_csv import read_report_csv, validate_report_paths
 from fatigue_analysis.adapters.openface_runner import run_openface_conversions
+from fatigue_analysis.application.planner import ExecutionPlan, build_execution_plan
 from fatigue_analysis.application.runner import run_features
 from fatigue_analysis.config.loader import config_to_yaml_text, init_config, load_config
 from fatigue_analysis.domain.errors import (
@@ -84,6 +85,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="OpenFace CSVの存在も検証する",
     )
     validate_parser.set_defaults(handler=_handle_validate_inputs)
+
+    plan_parser = subparsers.add_parser("plan", help="実行前の対象と生成予定を表示する")
+    plan_parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+    plan_parser.set_defaults(handler=_handle_plan)
 
     features_parser = subparsers.add_parser("features", help="特徴量CSVを生成する")
     features_parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
@@ -161,6 +166,13 @@ def _handle_validate_inputs(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_plan(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    plan = build_execution_plan(config)
+    print(_format_plan(plan))
+    return 0
+
+
 def _handle_features(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     run_id = args.run_id or f"run-{uuid.uuid4().hex[:12]}"
@@ -174,6 +186,36 @@ def _handle_features(args: argparse.Namespace) -> int:
         f"output={result.run_dir}"
     )
     return 0
+
+
+def _format_plan(plan: ExecutionPlan) -> str:
+    lines = [
+        "Plan summary:",
+        f"  samples={plan.sample_count}",
+        f"  baselines={plan.baseline_count}",
+        f"  movies={plan.movie_count}",
+        (
+            "  openface_csv="
+            f"{plan.openface_csv_existing_count} existing, "
+            f"{plan.openface_csv_missing_count} missing"
+        ),
+        f"  features={plan.feature_count} ({', '.join(plan.feature_instances)})",
+        (
+            "  visualizations="
+            f"timeseries:{plan.timeseries_count}, "
+            f"distributions:{plan.distribution_count}"
+        ),
+        f"  output_root={plan.output_root}",
+    ]
+    if plan.openface_csv_missing_sample_ids:
+        lines.append(
+            "  missing_openface_csv_samples="
+            + ", ".join(plan.openface_csv_missing_sample_ids[:10])
+        )
+        if len(plan.openface_csv_missing_sample_ids) > 10:
+            remaining = len(plan.openface_csv_missing_sample_ids) - 10
+            lines.append(f"  missing_openface_csv_samples_more={remaining}")
+    return "\n".join(lines)
 
 
 def _handle_openface(args: argparse.Namespace) -> int:
