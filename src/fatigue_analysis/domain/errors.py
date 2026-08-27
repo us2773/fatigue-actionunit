@@ -19,3 +19,7 @@ class OutputConflictError(FatigueAnalysisError):
 
 class NodeExecutionError(FatigueAnalysisError):
     """node内の数値処理や成果物生成が失敗した場合の例外。"""
+
+
+class ExternalToolError(FatigueAnalysisError):
+    """OpenFaceなど外部コマンドが失敗した場合の例外。"""

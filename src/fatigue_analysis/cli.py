@@ -8,12 +8,15 @@ import sys
 from pathlib import Path
 
 from fatigue_analysis.adapters.report_csv import read_report_csv, validate_report_paths
+from fatigue_analysis.adapters.openface_runner import run_openface_conversions
 from fatigue_analysis.application.runner import run_features
 from fatigue_analysis.config.loader import config_to_yaml_text, init_config, load_config
 from fatigue_analysis.domain.errors import (
     ConfigError,
+    ExternalToolError,
     FatigueAnalysisError,
     InputContractError,
+    OutputConflictError,
 )
 from fatigue_analysis.domain.signals import OPENFACE_AU_INTENSITY_SIGNAL_IDS
 
@@ -30,6 +33,15 @@ def main(argv: list[str] | None = None) -> int:
     except ConfigError as exc:
         print(f"Config error: {exc}", file=sys.stderr)
         return 2
+    except InputContractError as exc:
+        print(f"Input error: {exc}", file=sys.stderr)
+        return 2
+    except OutputConflictError as exc:
+        print(f"Output conflict: {exc}", file=sys.stderr)
+        return 3
+    except ExternalToolError as exc:
+        print(f"External tool error: {exc}", file=sys.stderr)
+        return 4
     except FatigueAnalysisError as exc:
         print(f"Execution error: {exc}", file=sys.stderr)
         return 1
@@ -82,6 +94,12 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     run_parser.add_argument("--run-id", default=None)
     run_parser.set_defaults(handler=_handle_features)
+
+    openface_parser = subparsers.add_parser("openface", help="動画からOpenFace CSVを生成する")
+    openface_parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+    openface_parser.add_argument("--run-id", default=None)
+    openface_parser.add_argument("--force", action="store_true")
+    openface_parser.set_defaults(handler=_handle_openface)
 
     return parser
 
@@ -154,5 +172,22 @@ def _handle_features(args: argparse.Namespace) -> int:
         f"samples={result.sample_count}, "
         f"excluded={result.excluded_count}, "
         f"output={result.run_dir}"
+    )
+    return 0
+
+
+def _handle_openface(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    run_id = args.run_id or f"openface-{uuid.uuid4().hex[:12]}"
+    results = run_openface_conversions(
+        config,
+        run_id=run_id,
+        force=bool(args.force),
+    )
+    created = sum(1 for result in results if result.status == "created")
+    skipped = sum(1 for result in results if result.status == "skipped")
+    print(
+        "OpenFace complete: "
+        f"run_id={run_id}, created={created}, skipped={skipped}"
     )
     return 0
