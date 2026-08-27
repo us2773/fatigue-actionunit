@@ -6,8 +6,14 @@ import argparse
 import sys
 from pathlib import Path
 
+from fatigue_analysis.adapters.report_csv import read_report_csv, validate_report_paths
 from fatigue_analysis.config.loader import config_to_yaml_text, init_config, load_config
-from fatigue_analysis.domain.errors import ConfigError, FatigueAnalysisError
+from fatigue_analysis.domain.errors import (
+    ConfigError,
+    FatigueAnalysisError,
+    InputContractError,
+)
+from fatigue_analysis.domain.signals import OPENFACE_AU_INTENSITY_SIGNAL_IDS
 
 DEFAULT_CONFIG_PATH = Path("conf/analysis.yaml")
 
@@ -56,6 +62,15 @@ def _build_parser() -> argparse.ArgumentParser:
     list_nodes = list_subparsers.add_parser("nodes", help="登録予定nodeを表示する")
     list_nodes.set_defaults(handler=_handle_list_nodes)
 
+    validate_parser = subparsers.add_parser("validate", help="入力ファイルを検証する")
+    validate_parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+    validate_parser.add_argument(
+        "--require-openface-csv",
+        action="store_true",
+        help="OpenFace CSVの存在も検証する",
+    )
+    validate_parser.set_defaults(handler=_handle_validate_inputs)
+
     return parser
 
 
@@ -83,7 +98,9 @@ def _handle_config_show(args: argparse.Namespace) -> int:
 
 def _handle_list_signals(args: argparse.Namespace) -> int:
     del args
-    print("au_intensity: use `all` or AU numbers such as `[1, 4, 45]`")
+    print("au_intensity:")
+    for signal_id in OPENFACE_AU_INTENSITY_SIGNAL_IDS:
+        print(f"  {signal_id}")
     return 0
 
 
@@ -92,4 +109,23 @@ def _handle_list_nodes(args: argparse.Namespace) -> int:
     print("trend_statistics")
     print("raw_peaks")
     print("raw_stft_mean_power")
+    return 0
+
+
+def _handle_validate_inputs(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    report = read_report_csv(
+        config.paths.report_csv,
+        expected_baselines_per_person=config.report.expected_baselines_per_person,
+    )
+    try:
+        validate_report_paths(
+            report,
+            movie_dir=config.paths.movie_dir,
+            openface_csv_dir=config.paths.openface_csv_dir,
+            require_openface_csv=bool(args.require_openface_csv),
+        )
+    except InputContractError:
+        raise
+    print(f"Inputs are valid: samples={len(report.samples)}")
     return 0
