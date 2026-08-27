@@ -5,6 +5,8 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from scipy.signal import find_peaks, stft
+from statsmodels.nonparametric.smoothers_lowess import lowess
 
 from fatigue_analysis.adapters.report_csv import read_report_csv
 from fatigue_analysis.domain.errors import NodeExecutionError, OutputConflictError
@@ -177,3 +179,63 @@ def test_duplicate_feature_column_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(OutputConflictError, match="重複"):
         feature_records_to_wide_rows(report, (records[0], records[0]))
+
+
+def test_lowess_matches_legacy_lowess_call() -> None:
+    """旧nodes.pyのLOWESS呼出し相当とtrend/residualが一致する。"""
+
+    timestamps = np.arange(10, dtype=float) / 30.0
+    values = np.array([0.0, 0.2, 0.4, 0.3, 0.2, 0.5, 0.8, 0.7, 0.6, 0.4])
+    raw_series = _series(values, timestamps=timestamps)
+
+    trend, residual = compute_lowess_series(raw_series, frac=0.1, it=3, delta=0.0)
+    legacy_trend = lowess(values, timestamps, frac=0.1, return_sorted=False)
+
+    assert np.allclose(trend.signals["AU01_r"], legacy_trend)
+    assert np.allclose(residual.signals["AU01_r"], values - legacy_trend)
+
+
+def test_raw_peaks_match_legacy_find_peaks_parameters() -> None:
+    """旧nodes.pyのfind_peaks既定値とpeak_countが一致する。"""
+
+    values = np.array([0.0, 0.4, 0.0, 0.2, 0.0, 0.9, 0.0, 0.3, 0.0, 0.7, 0.0])
+    raw_series = _series(values, timestamps=np.arange(len(values), dtype=float) / 30.0)
+    legacy_peaks, _ = find_peaks(values, height=0.1, distance=5, prominence=0.1)
+
+    records = compute_raw_peaks(
+        raw_series,
+        feature_instance="raw_peaks",
+        height=0.1,
+        prominence=0.1,
+        minimum_distance_seconds=0.1667,
+        sampling_rate_hz=30.0,
+    )
+    values_by_feature = {record.feature_id: record.value for record in records}
+
+    assert values_by_feature["count"] == float(len(legacy_peaks))
+
+
+def test_stft_mean_power_matches_legacy_stft_call() -> None:
+    """旧nodes.pyのSTFT呼出し相当と平均パワーが一致する。"""
+
+    timestamps = np.arange(60, dtype=float) / 30.0
+    values = np.sin(2 * math.pi * 3.0 * timestamps)
+    raw_series = _series(values, timestamps=timestamps)
+    legacy_frequencies, _, legacy_coefficients = stft(
+        values,
+        fs=30,
+        nperseg=20,
+        noverlap=10,
+    )
+    legacy_mean_power = np.mean(np.abs(legacy_coefficients) ** 2, axis=1)
+    expected = {
+        f"mean_power_{format(frequency, '.10g').replace('.', 'p')}_hz": power
+        for frequency, power in zip(legacy_frequencies[1:], legacy_mean_power[1:], strict=True)
+        if frequency <= 15
+    }
+
+    records = compute_raw_stft_mean_power(raw_series, feature_instance="raw_stft")
+    actual = {record.feature_id: record.value for record in records}
+
+    for feature_id, expected_value in expected.items():
+        assert actual[feature_id] == pytest.approx(expected_value)
