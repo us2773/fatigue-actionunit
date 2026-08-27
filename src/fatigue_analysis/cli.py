@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import uuid
 import sys
 from pathlib import Path
 
 from fatigue_analysis.adapters.report_csv import read_report_csv, validate_report_paths
+from fatigue_analysis.application.runner import run_features
 from fatigue_analysis.config.loader import config_to_yaml_text, init_config, load_config
 from fatigue_analysis.domain.errors import (
     ConfigError,
@@ -71,6 +73,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     validate_parser.set_defaults(handler=_handle_validate_inputs)
 
+    features_parser = subparsers.add_parser("features", help="特徴量CSVを生成する")
+    features_parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+    features_parser.add_argument("--run-id", default=None)
+    features_parser.set_defaults(handler=_handle_features)
+
+    run_parser = subparsers.add_parser("run", help="パイプラインを一括実行する")
+    run_parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+    run_parser.add_argument("--run-id", default=None)
+    run_parser.set_defaults(handler=_handle_features)
+
     return parser
 
 
@@ -128,4 +140,19 @@ def _handle_validate_inputs(args: argparse.Namespace) -> int:
     except InputContractError:
         raise
     print(f"Inputs are valid: samples={len(report.samples)}")
+    return 0
+
+
+def _handle_features(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    run_id = args.run_id or f"run-{uuid.uuid4().hex[:12]}"
+    result = run_features(config, run_id=run_id, repo_root=Path.cwd())
+    print(
+        "Run complete: "
+        f"run_id={result.run_id}, "
+        f"status={result.status}, "
+        f"samples={result.sample_count}, "
+        f"excluded={result.excluded_count}, "
+        f"output={result.run_dir}"
+    )
     return 0

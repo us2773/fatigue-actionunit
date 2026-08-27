@@ -65,6 +65,19 @@ def read_openface_csv(
     )
 
 
+def read_openface_columns(openface_csv_path: Path) -> tuple[str, ...]:
+    """OpenFace CSVヘッダーを正規化済み列名として読む。"""
+
+    if not openface_csv_path.exists():
+        raise InputContractError(f"OpenFace CSVが見つかりません: {openface_csv_path}")
+    with openface_csv_path.open("r", encoding="utf-8-sig", newline="") as csv_file:
+        reader = csv.reader(csv_file)
+        try:
+            return normalize_openface_columns(next(reader))
+        except StopIteration as exc:
+            raise InputContractError("OpenFace CSVが空です。") from exc
+
+
 def normalize_openface_columns(columns: Iterable[str]) -> tuple[str, ...]:
     """OpenFace CSV列名の前後空白を除去する。"""
 
