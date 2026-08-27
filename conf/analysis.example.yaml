@@ -1,0 +1,90 @@
+schema_version: 1
+
+paths:
+  report_csv: data/02_report/report.csv
+  movie_dir: data/01_raw/movie
+  openface_csv_dir: data/01_raw/openface_csv
+  output_root: data/outputs
+
+openface:
+  powershell_script: scripts/run_openface.ps1
+  local_environment_config: conf/openface.local.ps1
+  skip_existing: true
+
+report:
+  expected_baselines_per_person: 2
+  extra_column_types: {}
+
+signals:
+  au_intensity:
+    au_numbers: all
+
+preprocessing:
+  initial_trim_ratio: 0.10
+  confidence_threshold: 0.70
+  lowess:
+    enabled: true
+    frac: 0.10
+    it: 3
+    delta: 0.0
+
+features:
+  - instance_id: trend_stats
+    node_id: trend_statistics
+    signals:
+      au_numbers: all
+    params:
+      metrics: [mean, variance]
+      ddof: 0
+  - instance_id: raw_peaks
+    node_id: raw_peaks
+    signals:
+      au_numbers: all
+    params:
+      height: 0.1
+      prominence: 0.1
+      minimum_distance_seconds: 0.1667
+      sampling_rate_hz: 30
+  - instance_id: raw_stft
+    node_id: raw_stft_mean_power
+    signals:
+      au_numbers: all
+    params:
+      sampling_rate_hz: 30
+      frequency_step_hz: 1.5
+      max_frequency_hz: 15
+      overlap_ratio: 0.5
+      window: hann
+      detrend: false
+      boundary: zeros
+      padded: true
+      exclude_dc: true
+
+analysis:
+  filters: []
+  derived_columns:
+    expression_direction:
+      source: class
+      mapping:
+        drowsy_direction: [1, 2]
+        stiff_direction: [3, 4]
+
+visualizations:
+  timeseries: []
+  distributions:
+    - feature_patterns: ["*__trend_stats__mean"]
+      groups:
+        - label: baseline
+          where: {is_baseface: [1]}
+        - label: drowsy_direction
+          where: {is_baseface: [0], class: [1, 2]}
+        - label: stiff_direction
+          where: {is_baseface: [0], class: [3, 4]}
+      color_by: person
+      facet_by: null
+
+outputs:
+  save_intermediate_nodes: []
+  csv_encoding: utf-8-sig
+  float_precision: 10
+  overwrite: false
