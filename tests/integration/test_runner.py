@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 
 import numpy as np
@@ -22,8 +23,23 @@ def test_run_features_writes_wide_csv_and_manifest(tmp_path: Path) -> None:
     assert result.excluded_count == 0
     assert result.feature_csv.exists()
     assert result.manifest_json.exists()
+    distribution_png = (
+        result.run_dir
+        / "figures"
+        / "distributions"
+        / "dist_01_AU01_r__trend_stats__mean.png"
+    )
+    distribution_stats = (
+        result.run_dir
+        / "plot_data"
+        / "distributions"
+        / "dist_01_AU01_r__trend_stats__mean_stats.csv"
+    )
+    assert distribution_png.exists()
+    assert distribution_stats.exists()
 
     rows = list(csv.DictReader(result.feature_csv.open("r", encoding="utf-8-sig")))
+    manifest = json.loads(result.manifest_json.read_text(encoding="utf-8"))
     assert len(rows) == 2
     assert rows[0]["Name"] == "sample-001"
     assert rows[0]["class_label"] == "だるい"
@@ -33,6 +49,10 @@ def test_run_features_writes_wide_csv_and_manifest(tmp_path: Path) -> None:
     assert "AU01_r__trend_stats__mean" in rows[0]
     assert "AU01_r__raw_peaks__count" in rows[0]
     assert "AU01_r__raw_stft__mean_power_3_hz" in rows[0]
+    assert (
+        manifest["artifacts"]["distribution_01_AU01_r__trend_stats__mean_png"]
+        == "figures/distributions/dist_01_AU01_r__trend_stats__mean.png"
+    )
 
 
 def test_run_features_reproducible_feature_csv(tmp_path: Path) -> None:
@@ -131,7 +151,15 @@ analysis:
   derived_columns: {{}}
 visualizations:
   timeseries: []
-  distributions: []
+  distributions:
+    - feature_patterns: ["AU01_r__trend_stats__mean"]
+      groups:
+        - label: baseline
+          where: {{is_baseface: [1]}}
+        - label: non_base
+          where: {{is_baseface: [0]}}
+      color_by: person
+      facet_by: null
 outputs:
   save_intermediate_nodes: []
   csv_encoding: utf-8-sig
