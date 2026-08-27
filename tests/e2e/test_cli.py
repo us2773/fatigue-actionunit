@@ -45,6 +45,28 @@ def test_cli_validate_and_features(tmp_path: Path) -> None:
     assert "trend_statistics: version=1" in nodes.stdout
     assert "source_series=trend" in nodes.stdout
 
+    config_set = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "fatigue_analysis",
+            "config",
+            "set",
+            "--config",
+            str(config_path),
+            "--key",
+            "preprocessing.lowess.frac",
+            "--value",
+            "0.5",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert config_set.returncode == 0
+    assert "Config updated" in config_set.stdout
+
     features = subprocess.run(
         [
             sys.executable,

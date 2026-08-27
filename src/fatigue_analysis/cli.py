@@ -12,7 +12,12 @@ from fatigue_analysis.adapters.openface_runner import run_openface_conversions
 from fatigue_analysis.application.planner import ExecutionPlan, build_execution_plan
 from fatigue_analysis.application.registry import default_feature_registry
 from fatigue_analysis.application.runner import run_features
-from fatigue_analysis.config.loader import config_to_yaml_text, init_config, load_config
+from fatigue_analysis.config.loader import (
+    config_to_yaml_text,
+    init_config,
+    load_config,
+    set_config_value,
+)
 from fatigue_analysis.domain.errors import (
     ConfigError,
     ExternalToolError,
@@ -68,6 +73,12 @@ def _build_parser() -> argparse.ArgumentParser:
     config_show = config_subparsers.add_parser("show", help="解決済み設定を表示する")
     config_show.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     config_show.set_defaults(handler=_handle_config_show)
+
+    config_set = config_subparsers.add_parser("set", help="設定値を検証付きで更新する")
+    config_set.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
+    config_set.add_argument("--key", required=True)
+    config_set.add_argument("--value", required=True)
+    config_set.set_defaults(handler=_handle_config_set)
 
     list_parser = subparsers.add_parser("list", help="利用可能な項目を表示する")
     list_subparsers = list_parser.add_subparsers(dest="list_target", required=True)
@@ -132,6 +143,18 @@ def _handle_config_validate(args: argparse.Namespace) -> int:
 def _handle_config_show(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     print(config_to_yaml_text(config), end="")
+    return 0
+
+
+def _handle_config_set(args: argparse.Namespace) -> int:
+    result = set_config_value(args.config, key=args.key, value_text=args.value)
+    print(
+        "Config updated: "
+        f"key={result.key}, "
+        f"old={result.old_value!r}, "
+        f"new={result.new_value!r}, "
+        f"backup={result.backup_path}"
+    )
     return 0
 
 

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from fatigue_analysis.config.loader import load_config
+from fatigue_analysis.config.loader import load_config, set_config_value
 from fatigue_analysis.domain.errors import ConfigError
 
 
@@ -58,3 +58,43 @@ def test_unknown_top_level_key_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(ConfigError, match="未知キー"):
         load_config(config_path)
+
+
+def test_set_config_value_updates_yaml_with_backup(tmp_path: Path) -> None:
+    """dot path指定で正本YAMLを更新し、更新前backupを作る。"""
+
+    config_path = tmp_path / "analysis.yaml"
+    config_path.write_text(
+        Path("conf/analysis.example.yaml").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+
+    result = set_config_value(
+        config_path,
+        key="preprocessing.lowess.frac",
+        value_text="0.2",
+    )
+    config = load_config(config_path)
+
+    assert result.old_value == 0.10
+    assert result.new_value == 0.2
+    assert result.backup_path.exists()
+    assert config.preprocessing.lowess.frac == 0.2
+
+
+def test_set_config_value_rejects_invalid_result_without_write(tmp_path: Path) -> None:
+    """更新後の型検証に失敗した場合は元YAMLを維持する。"""
+
+    config_path = tmp_path / "analysis.yaml"
+    original_text = Path("conf/analysis.example.yaml").read_text(encoding="utf-8")
+    config_path.write_text(original_text, encoding="utf-8")
+
+    with pytest.raises(ConfigError, match="0より大きく1以下"):
+        set_config_value(
+            config_path,
+            key="preprocessing.lowess.frac",
+            value_text="2.0",
+        )
+
+    assert config_path.read_text(encoding="utf-8") == original_text
+    assert list(tmp_path.glob("*.bak")) == []
