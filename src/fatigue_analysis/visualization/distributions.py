@@ -23,6 +23,15 @@ class DistributionGroup:
     where: Mapping[str, tuple[str, ...]]
 
 
+@dataclass(frozen=True)
+class ScatterPoint:
+    """分布図へ重ねる1点の描画情報。"""
+
+    x: float
+    y: float
+    label: str | None
+
+
 def plot_feature_distribution(
     rows: Sequence[Mapping[str, str]],
     *,
@@ -40,6 +49,7 @@ def plot_feature_distribution(
     stats_csv.parent.mkdir(parents=True, exist_ok=True)
 
     grouped_values: list[np.ndarray] = []
+    scatter_points: list[ScatterPoint] = []
     stats_rows: list[dict[str, object]] = []
     figure, axis = plt.subplots(figsize=(8, 4.8))
 
@@ -59,14 +69,12 @@ def plot_feature_distribution(
             sample_id = row.get("Name", "")
             jitter = _stable_jitter(sample_id)
             color_value = row.get(color_by, "") if color_by else ""
-            axis.scatter(
-                group_index + jitter,
-                float(raw_value),
-                s=28,
-                alpha=0.8,
-                label=f"{color_by}={color_value}" if color_by else None,
-                edgecolors="#333333",
-                linewidths=0.4,
+            scatter_points.append(
+                ScatterPoint(
+                    x=group_index + jitter,
+                    y=float(raw_value),
+                    label=f"{color_by}={color_value}" if color_by else None,
+                )
             )
 
     if all(len(values) == 0 for values in grouped_values):
@@ -79,6 +87,17 @@ def plot_feature_distribution(
         boxprops={"facecolor": "#d8e6f3", "edgecolor": "#333333"},
         medianprops={"color": "#b22222", "linewidth": 1.5},
     )
+    for point in scatter_points:
+        axis.scatter(
+            point.x,
+            point.y,
+            s=28,
+            alpha=0.8,
+            label=point.label,
+            edgecolors="#333333",
+            linewidths=0.4,
+            zorder=3,
+        )
     axis.set_xticks(range(1, len(groups) + 1))
     axis.set_xticklabels([group.label for group in groups])
     axis.set_ylabel(feature_column)
