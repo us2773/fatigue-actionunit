@@ -35,7 +35,11 @@ def run_openface_conversions(
         config.paths.report_csv,
         expected_baselines_per_person=config.report.expected_baselines_per_person,
     )
-    validate_report_paths(report, movie_dir=config.paths.movie_dir)
+    validate_report_paths(
+        report,
+        movie_dir=config.paths.movie_dir,
+        require_movie=True,
+    )
 
     script_path = config.openface.powershell_script
     local_config_path = config.openface.local_environment_config

@@ -48,7 +48,19 @@ def test_run_features_reproducible_feature_csv(tmp_path: Path) -> None:
     assert first.feature_csv.read_bytes() == second.feature_csv.read_bytes()
 
 
-def _write_synthetic_project(tmp_path: Path) -> Path:
+def test_run_features_accepts_openface_csv_without_movies(tmp_path: Path) -> None:
+    """特徴量算出は既存OpenFace CSVがあれば動画なしで実行できる。"""
+
+    config_path = _write_synthetic_project(tmp_path, include_movies=False)
+    config = load_config(config_path)
+
+    result = run_features(config, run_id="it-run-csv-only", repo_root=Path.cwd())
+
+    assert result.status == "succeeded"
+    assert result.feature_csv.exists()
+
+
+def _write_synthetic_project(tmp_path: Path, *, include_movies: bool = True) -> Path:
     movie_dir = tmp_path / "data" / "01_raw" / "movie"
     openface_dir = tmp_path / "data" / "01_raw" / "openface_csv"
     report_dir = tmp_path / "data" / "02_report"
@@ -58,8 +70,9 @@ def _write_synthetic_project(tmp_path: Path) -> Path:
     report_dir.mkdir(parents=True)
     output_root.mkdir(parents=True)
 
-    (movie_dir / "sample-001.mp4").write_text("dummy", encoding="utf-8")
-    (movie_dir / "sample-002.mp4").write_text("dummy", encoding="utf-8")
+    if include_movies:
+        (movie_dir / "sample-001.mp4").write_text("dummy", encoding="utf-8")
+        (movie_dir / "sample-002.mp4").write_text("dummy", encoding="utf-8")
     (report_dir / "report.csv").write_text(
         "Name,person,check_date,class,fatigue_level,is_baseface\n"
         "sample-001,1,2026/8/24,1,1,0\n"

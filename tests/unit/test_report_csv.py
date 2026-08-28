@@ -143,7 +143,7 @@ def test_validate_report_paths_checks_report_samples_only(tmp_path: Path) -> Non
     )
     report = read_report_csv(report_path, expected_baselines_per_person=0)
 
-    validate_report_paths(report, movie_dir=movie_dir)
+    validate_report_paths(report, movie_dir=movie_dir, require_movie=True)
 
 
 def test_validate_report_paths_rejects_missing_movie(tmp_path: Path) -> None:
@@ -160,4 +160,53 @@ def test_validate_report_paths_rejects_missing_movie(tmp_path: Path) -> None:
     report = read_report_csv(report_path, expected_baselines_per_person=0)
 
     with pytest.raises(InputContractError, match="動画"):
-        validate_report_paths(report, movie_dir=movie_dir)
+        validate_report_paths(report, movie_dir=movie_dir, require_movie=True)
+
+
+def test_validate_report_paths_accepts_openface_csv_without_movie(
+    tmp_path: Path,
+) -> None:
+    """OpenFace CSV利用時は動画がなくても入力を受理する。"""
+
+    report_path = tmp_path / "report.csv"
+    openface_dir = tmp_path / "openface_csv"
+    openface_dir.mkdir()
+    (openface_dir / "sample-001.csv").write_text(
+        "timestamp,success,confidence,AU01_r\n",
+        encoding="utf-8",
+    )
+    report_path.write_text(
+        "Name,person,check_date,class,fatigue_level,is_baseface\n"
+        "sample-001,1,2026/8/24,1,1,0\n",
+        encoding="utf-8",
+    )
+    report = read_report_csv(report_path, expected_baselines_per_person=0)
+
+    validate_report_paths(
+        report,
+        openface_csv_dir=openface_dir,
+        require_openface_csv=True,
+    )
+
+
+def test_validate_report_paths_rejects_missing_openface_csv(
+    tmp_path: Path,
+) -> None:
+    """OpenFace CSV必須モードではCSV欠損を拒否する。"""
+
+    report_path = tmp_path / "report.csv"
+    openface_dir = tmp_path / "openface_csv"
+    openface_dir.mkdir()
+    report_path.write_text(
+        "Name,person,check_date,class,fatigue_level,is_baseface\n"
+        "sample-001,1,2026/8/24,1,1,0\n",
+        encoding="utf-8",
+    )
+    report = read_report_csv(report_path, expected_baselines_per_person=0)
+
+    with pytest.raises(InputContractError, match="OpenFace CSV"):
+        validate_report_paths(
+            report,
+            openface_csv_dir=openface_dir,
+            require_openface_csv=True,
+        )

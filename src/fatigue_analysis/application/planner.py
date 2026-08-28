@@ -39,11 +39,15 @@ def build_execution_plan(config: AnalysisConfig) -> ExecutionPlan:
     )
     validate_report_paths(
         report,
-        movie_dir=config.paths.movie_dir,
         openface_csv_dir=config.paths.openface_csv_dir,
         require_openface_csv=False,
     )
 
+    movie_count = sum(
+        1
+        for sample in report.samples
+        if (config.paths.movie_dir / f"{sample.sample_id}.mp4").exists()
+    )
     missing_openface = tuple(
         sample.sample_id
         for sample in report.samples
@@ -55,7 +59,7 @@ def build_execution_plan(config: AnalysisConfig) -> ExecutionPlan:
     return ExecutionPlan(
         sample_count=len(report.samples),
         baseline_count=sum(1 for sample in report.samples if sample.is_baseface),
-        movie_count=len(report.samples),
+        movie_count=movie_count,
         openface_csv_existing_count=existing_openface_count,
         openface_csv_missing_count=len(missing_openface),
         openface_csv_missing_sample_ids=missing_openface,

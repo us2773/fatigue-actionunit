@@ -99,6 +99,11 @@ def _build_parser() -> argparse.ArgumentParser:
     validate_parser = subparsers.add_parser("validate", help="入力ファイルを検証する")
     validate_parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     validate_parser.add_argument(
+        "--require-movie",
+        action="store_true",
+        help="動画の存在も検証する",
+    )
+    validate_parser.add_argument(
         "--require-openface-csv",
         action="store_true",
         help="OpenFace CSVの存在も検証する",
@@ -223,6 +228,7 @@ def _handle_validate_inputs(args: argparse.Namespace) -> int:
             report,
             movie_dir=config.paths.movie_dir,
             openface_csv_dir=config.paths.openface_csv_dir,
+            require_movie=bool(args.require_movie),
             require_openface_csv=bool(args.require_openface_csv),
         )
     except InputContractError:

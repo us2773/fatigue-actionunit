@@ -69,7 +69,6 @@ def run_features(
     )
     validate_report_paths(
         report,
-        movie_dir=config.paths.movie_dir,
         openface_csv_dir=config.paths.openface_csv_dir,
         require_openface_csv=True,
     )

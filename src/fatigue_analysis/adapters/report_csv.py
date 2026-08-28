@@ -54,21 +54,25 @@ def read_report_csv(
 def validate_report_paths(
     report: ReportTable,
     *,
-    movie_dir: Path,
+    movie_dir: Path | None = None,
     openface_csv_dir: Path | None = None,
+    require_movie: bool = False,
     require_openface_csv: bool = False,
 ) -> None:
-    """`Name` から動画とOpenFace CSVの存在を確認する。"""
+    """`Name` から必要な入力ファイルの存在を確認する。"""
 
-    missing_movies = [
-        sample.sample_id
-        for sample in report.samples
-        if not (movie_dir / f"{sample.sample_id}.mp4").exists()
-    ]
-    if missing_movies:
-        raise InputContractError(
-            "report.csv に対応する動画がありません: " + ", ".join(missing_movies)
-        )
+    if require_movie:
+        if movie_dir is None:
+            raise InputContractError("動画ディレクトリが指定されていません。")
+        missing_movies = [
+            sample.sample_id
+            for sample in report.samples
+            if not (movie_dir / f"{sample.sample_id}.mp4").exists()
+        ]
+        if missing_movies:
+            raise InputContractError(
+                "report.csv に対応する動画がありません: " + ", ".join(missing_movies)
+            )
 
     if require_openface_csv:
         if openface_csv_dir is None:

@@ -19,7 +19,7 @@ def test_build_execution_plan_summarizes_inputs_without_openface_requirement(
 
     assert plan.sample_count == 2
     assert plan.baseline_count == 1
-    assert plan.movie_count == 2
+    assert plan.movie_count == 0
     assert plan.openface_csv_existing_count == 1
     assert plan.openface_csv_missing_count == 1
     assert plan.openface_csv_missing_sample_ids == ("sample-002",)
@@ -35,8 +35,6 @@ def _write_project(tmp_path: Path) -> Path:
     openface_dir.mkdir(parents=True)
     report_dir.mkdir(parents=True)
     output_root.mkdir(parents=True)
-    (movie_dir / "sample-001.mp4").write_text("dummy", encoding="utf-8")
-    (movie_dir / "sample-002.mp4").write_text("dummy", encoding="utf-8")
     (report_dir / "report.csv").write_text(
         "Name,person,check_date,class,fatigue_level,is_baseface\n"
         "sample-001,1,2026/8/24,1,1,0\n"

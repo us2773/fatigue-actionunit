@@ -8,7 +8,7 @@ import pytest
 from fatigue_analysis.adapters import openface_runner
 from fatigue_analysis.adapters.openface_runner import run_openface_conversions
 from fatigue_analysis.config.loader import load_config
-from fatigue_analysis.domain.errors import ExternalToolError
+from fatigue_analysis.domain.errors import ExternalToolError, InputContractError
 
 
 def test_openface_runner_skips_existing_csv(tmp_path: Path) -> None:
@@ -77,7 +77,16 @@ def test_openface_runner_raises_on_failure(
         run_openface_conversions(config, run_id="openface-test")
 
 
-def _write_project(tmp_path: Path) -> Path:
+def test_openface_runner_requires_movie_file(tmp_path: Path) -> None:
+    """OpenFace変換コマンドでは動画欠損を拒否する。"""
+
+    config = load_config(_write_project(tmp_path, include_movie=False))
+
+    with pytest.raises(InputContractError, match="動画"):
+        run_openface_conversions(config, run_id="openface-test")
+
+
+def _write_project(tmp_path: Path, *, include_movie: bool = True) -> Path:
     movie_dir = tmp_path / "data" / "01_raw" / "movie"
     openface_dir = tmp_path / "data" / "01_raw" / "openface_csv"
     report_dir = tmp_path / "data" / "02_report"
@@ -87,7 +96,8 @@ def _write_project(tmp_path: Path) -> Path:
     for directory in (movie_dir, openface_dir, report_dir, output_root, script_path.parent, local_config_path.parent):
         directory.mkdir(parents=True, exist_ok=True)
 
-    (movie_dir / "sample-001.mp4").write_text("dummy", encoding="utf-8")
+    if include_movie:
+        (movie_dir / "sample-001.mp4").write_text("dummy", encoding="utf-8")
     (report_dir / "report.csv").write_text(
         "Name,person,check_date,class,fatigue_level,is_baseface\n"
         "sample-001,1,2026/8/24,1,1,0\n",
