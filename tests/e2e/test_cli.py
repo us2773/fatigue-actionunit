@@ -8,6 +8,69 @@ from pathlib import Path
 import numpy as np
 
 
+def test_cli_config_init_creates_initial_yaml(tmp_path: Path) -> None:
+    """CLIでGit追跡外の初期YAMLを作成し、既存ファイルを保護する。"""
+
+    config_path = tmp_path / "conf" / "analysis.yaml"
+
+    init = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "fatigue_analysis",
+            "config",
+            "init",
+            "--config",
+            str(config_path),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    assert init.returncode == 0
+    assert "Initial config YAML created" in init.stdout
+    assert config_path.exists()
+
+    validate = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "fatigue_analysis",
+            "config",
+            "validate",
+            "--config",
+            str(config_path),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert validate.returncode == 0
+    assert "Config is valid" in validate.stdout
+
+    duplicate = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "fatigue_analysis",
+            "config",
+            "init",
+            "--config",
+            str(config_path),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    assert duplicate.returncode == 3
+    assert "Output conflict" in duplicate.stderr
+
+
 def test_cli_validate_and_features(tmp_path: Path) -> None:
     """CLIでvalidateからfeatures生成までを最小E2Eとして確認する。"""
 

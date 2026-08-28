@@ -65,7 +65,7 @@ def _build_parser() -> argparse.ArgumentParser:
     config_parser = subparsers.add_parser("config", help="設定YAMLを操作する")
     config_subparsers = config_parser.add_subparsers(dest="config_command", required=True)
 
-    config_init = config_subparsers.add_parser("init", help="設定雛形を作成する")
+    config_init = config_subparsers.add_parser("init", help="初期設定YAMLを作成する")
     config_init.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     config_init.add_argument("--overwrite", action="store_true")
     config_init.set_defaults(handler=_handle_config_init)
@@ -158,7 +158,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _handle_config_init(args: argparse.Namespace) -> int:
     init_config(args.config, overwrite=bool(args.overwrite))
-    print(f"Created config template: {args.config}")
+    print(f"Initial config YAML created: {args.config}")
     return 0
 
 
